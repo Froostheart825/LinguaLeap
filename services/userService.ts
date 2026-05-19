@@ -91,6 +91,10 @@ export async function addXp(userId: string, amount: number, source: string): Pro
   const newTotalXp = user.totalXp + amount;
   const newTodayXp = isSameDay ? user.todayXp + amount : amount;
 
+  // Accumulate weekly XP (after possible reset)
+  await checkAndResetWeeklyXp();
+  await addWeeklyXp(amount);
+
   // Streak logic
   let newStreak = user.currentStreak;
   let newLongest = user.longestStreak;
@@ -164,6 +168,54 @@ export async function useStreakFreeze(): Promise<boolean> {
   if (current <= 0) return false;
   await AsyncStorage.setItem(STREAK_FREEZE_KEY, String(current - 1));
   return true;
+}
+
+// ── Weekly XP ────────────────────────────────────────────────────────────
+const WEEKLY_XP_KEY = 'weekly_xp';
+const LAST_RESET_WEEK_KEY = 'last_reset_week';
+
+/** Returns ISO week string like "2025-W21" */
+function getISOWeekKey(date: Date = new Date()): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7; // Mon=1 … Sun=7
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+}
+
+export async function getWeeklyXp(): Promise<number> {
+  const raw = await AsyncStorage.getItem(WEEKLY_XP_KEY);
+  return raw ? parseInt(raw) : 0;
+}
+
+export async function checkAndResetWeeklyXp(): Promise<{ weeklyXp: number; wasReset: boolean }> {
+  const currentWeek = getISOWeekKey();
+  const lastReset = await AsyncStorage.getItem(LAST_RESET_WEEK_KEY);
+  const weeklyXp = await getWeeklyXp();
+
+  if (lastReset !== currentWeek) {
+    await AsyncStorage.setItem(WEEKLY_XP_KEY, '0');
+    await AsyncStorage.setItem(LAST_RESET_WEEK_KEY, currentWeek);
+    return { weeklyXp: 0, wasReset: true };
+  }
+  return { weeklyXp, wasReset: false };
+}
+
+export async function addWeeklyXp(amount: number): Promise<void> {
+  const current = await getWeeklyXp();
+  await AsyncStorage.setItem(WEEKLY_XP_KEY, String(current + amount));
+}
+
+/** Returns ms until next Monday 00:00 UTC */
+export function getMsUntilNextReset(): number {
+  const now = new Date();
+  const nextMonday = new Date(now);
+  const dayOfWeek = now.getUTCDay(); // 0=Sun,1=Mon,…,6=Sat
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+  nextMonday.setUTCDate(now.getUTCDate() + daysUntilMonday);
+  nextMonday.setUTCHours(0, 0, 0, 0);
+  return nextMonday.getTime() - now.getTime();
 }
 
 export async function checkAndUpdateStreak(user: User): Promise<User> {
