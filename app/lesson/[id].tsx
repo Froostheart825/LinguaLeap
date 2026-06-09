@@ -1,10 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Animated,
-  StatusBar, Platform,
+  StatusBar,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getLessonById, getVocabularyByLesson } from '../../services/lessonService';
 import { useLessons } from '../../hooks/useLessons';
 import { Colors, FontSize, FontWeight, Spacing, Radius, Shadow } from '../../constants/theme';
@@ -75,7 +75,6 @@ function VocabCard({
   const handleSpeak = () => {
     if (speaking) return;
     setSpeaking(true);
-    // Button bounce
     Animated.sequence([
       Animated.timing(speakScale, { toValue: 0.85, duration: 80, useNativeDriver: true }),
       Animated.timing(speakScale, { toValue: 1, duration: 120, useNativeDriver: true }),
@@ -90,19 +89,16 @@ function VocabCard({
 
   return (
     <Animated.View style={[styles.vocabCard, Shadow.sm, { opacity: fadeAnim }]}>
-      {/* Number badge */}
       <View style={[styles.numBadge, { backgroundColor: accentColor + '18' }]}>
         <Text style={[styles.numText, { color: accentColor }]}>{index + 1}</Text>
       </View>
 
       <View style={styles.vocabInner}>
-        {/* Word row */}
         <View style={styles.wordRow}>
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.word}>{vocab.word}</Text>
             <Text style={[styles.phonetic, { color: accentColor }]}>{vocab.phonetic}</Text>
           </View>
-          {/* TTS button */}
           <Animated.View style={{ transform: [{ scale: speakScale }] }}>
             <Pressable
               onPress={handleSpeak}
@@ -118,12 +114,10 @@ function VocabCard({
           </Animated.View>
         </View>
 
-        {/* Meaning */}
         <View style={[styles.meaningRow, { borderLeftColor: accentColor }]}>
           <Text style={styles.meaning}>{vocab.meaning}</Text>
         </View>
 
-        {/* Example toggle */}
         <Pressable onPress={() => setShowExample(v => !v)} style={styles.exampleToggle}>
           <Text style={[styles.exampleToggleText, { color: accentColor }]}>
             {showExample ? '▲ Hide example' : '▼ Show example'}
@@ -152,7 +146,56 @@ export default function LessonDetailScreen() {
   const vocab = getVocabularyByLesson(id as string);
   const progress = getLessonProgress(id as string);
 
-  // Scroll-driven header collapse
+  // ── Preview All Words ──────────────────────────────────────────────────────
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(-1);
+  const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Stop preview and clean up on unmount
+  useEffect(() => {
+    return () => {
+      Speech.stop();
+      if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+    };
+  }, []);
+
+  const stopPreview = () => {
+    Speech.stop();
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+      previewTimeoutRef.current = null;
+    }
+    setIsPreviewing(false);
+    setPreviewIndex(-1);
+  };
+
+  const startPreview = () => {
+    if (vocab.length === 0 || isPreviewing) return;
+    setIsPreviewing(true);
+
+    const playWord = (index: number) => {
+      if (index >= vocab.length) {
+        setIsPreviewing(false);
+        setPreviewIndex(-1);
+        return;
+      }
+      setPreviewIndex(index);
+      Speech.speak(vocab[index].word, {
+        language: 'en-US',
+        rate: 0.85,
+        onDone: () => {
+          previewTimeoutRef.current = setTimeout(() => playWord(index + 1), 1500);
+        },
+        onError: () => {
+          previewTimeoutRef.current = setTimeout(() => playWord(index + 1), 1500);
+        },
+      });
+    };
+
+    playWord(0);
+  };
+
+  // ── Scroll-driven header collapse ─────────────────────────────────────────
   const scrollY = useRef(new Animated.Value(0)).current;
   const HERO_HEIGHT = 260;
 
@@ -163,10 +206,9 @@ export default function LessonDetailScreen() {
   if (!lesson) return null;
 
   const isCompleted = progress?.status === LESSON_STATUS.COMPLETED;
-  const catColor  = CATEGORY_COLORS[lesson.category] || Colors.primary;
-  const catDark   = CATEGORY_DARK[lesson.category]   || Colors.primaryDark;
-  const catLabel  = CATEGORY_LABELS[lesson.category]  || lesson.category;
-  const catIcon   = CATEGORY_ICONS[lesson.category]   || '📘';
+  const catColor = CATEGORY_COLORS[lesson.category] || Colors.primary;
+  const catDark  = CATEGORY_DARK[lesson.category]   || Colors.primaryDark;
+  const catIcon  = CATEGORY_ICONS[lesson.category]  || '📘';
 
   const startLesson = () =>
     router.push({ pathname: '/exercise', params: { lessonId: lesson.id } });
@@ -180,7 +222,6 @@ export default function LessonDetailScreen() {
         <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
-        {/* Lesson title fades in as hero scrolls away */}
         <Animated.Text style={[styles.navTitle, { opacity: stickyTitleOpacity }]} numberOfLines={1}>
           {lesson.title}
         </Animated.Text>
@@ -198,8 +239,6 @@ export default function LessonDetailScreen() {
         <Text style={styles.heroIcon}>{catIcon}</Text>
         <Text style={styles.heroTitle}>{lesson.title}</Text>
         <Text style={styles.heroDesc} numberOfLines={2}>{lesson.description}</Text>
-
-        {/* Meta chips */}
         <View style={styles.heroChips}>
           <View style={[styles.chip, { backgroundColor: catDark + 'CC' }]}>
             <Text style={styles.chipText}>⚡ +{lesson.xpReward} XP</Text>
@@ -218,7 +257,6 @@ export default function LessonDetailScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
         style={styles.scroll}
       >
-        {/* White sheet starts here — rounded top corners */}
         <View style={[styles.sheet, { marginTop: HERO_HEIGHT - 28 }]}>
 
           {/* ── Lesson info section ─────────────────────────── */}
@@ -233,7 +271,6 @@ export default function LessonDetailScreen() {
               </View>
             </View>
 
-            {/* Best score row — only if completed */}
             {isCompleted && (
               <View style={[styles.bestScoreRow, { backgroundColor: catColor + '12', borderColor: catColor + '33' }]}>
                 <View style={{ gap: 4 }}>
@@ -247,7 +284,6 @@ export default function LessonDetailScreen() {
               </View>
             )}
 
-            {/* Completion streak */}
             {isCompleted && (progress?.completionCount ?? 0) > 1 && (
               <View style={styles.completionBanner}>
                 <Text style={styles.completionText}>
@@ -263,12 +299,62 @@ export default function LessonDetailScreen() {
 
           {/* ── Vocabulary list ──────────────────────────────── */}
           <View style={styles.vocabSection}>
+
+            {/* Section header with Preview button */}
             <View style={styles.vocabHeader}>
-              <Text style={styles.sectionTitle}>Vocabulary</Text>
-              <View style={[styles.countBadge, { backgroundColor: catColor }]}>
-                <Text style={styles.countText}>{vocab.length}</Text>
+              <View style={styles.vocabHeaderLeft}>
+                <Text style={styles.sectionTitle}>Vocabulary</Text>
+                <View style={[styles.countBadge, { backgroundColor: catColor }]}>
+                  <Text style={styles.countText}>{vocab.length}</Text>
+                </View>
               </View>
+
+              {vocab.length > 0 && (
+                isPreviewing ? (
+                  <Pressable
+                    onPress={stopPreview}
+                    style={({ pressed }) => [
+                      styles.previewBtn,
+                      { backgroundColor: Colors.errorBg, borderColor: Colors.error + '66' },
+                      pressed && { opacity: 0.75 },
+                    ]}
+                  >
+                    <Text style={[styles.previewBtnIcon, { color: Colors.error }]}>⏹</Text>
+                    <Text style={[styles.previewBtnText, { color: Colors.error }]}>
+                      {previewIndex + 1}/{vocab.length}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={startPreview}
+                    style={({ pressed }) => [
+                      styles.previewBtn,
+                      { backgroundColor: catColor + '18', borderColor: catColor + '55' },
+                      pressed && { opacity: 0.75 },
+                    ]}
+                  >
+                    <Text style={[styles.previewBtnIcon, { color: catColor }]}>▶</Text>
+                    <Text style={[styles.previewBtnText, { color: catColor }]}>Preview all</Text>
+                  </Pressable>
+                )
+              )}
             </View>
+
+            {/* Playing progress banner */}
+            {isPreviewing && (
+              <View style={[styles.playingBanner, { backgroundColor: catColor + '12', borderColor: catColor + '33' }]}>
+                <Text style={styles.playingIcon}>🔊</Text>
+                <Text style={[styles.playingWord, { color: catColor }]} numberOfLines={1}>
+                  {previewIndex >= 0 ? vocab[previewIndex]?.word : '...'}
+                </Text>
+                <View style={[styles.playingPill, { backgroundColor: catColor }]}>
+                  <Text style={styles.playingPillText}>
+                    {previewIndex + 1} of {vocab.length}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <Text style={styles.vocabHint}>Tap 🔉 to hear pronunciation · Tap a card to see example</Text>
 
             {vocab.length === 0 ? (
@@ -287,7 +373,6 @@ export default function LessonDetailScreen() {
 
       {/* ── Sticky footer CTA ─────────────────────────────────────────── */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.md), backgroundColor: Colors.background }]}>
-        {/* Progress indicator if previously completed */}
         {isCompleted && (
           <View style={styles.footerMeta}>
             <StarRating stars={progress?.stars ?? 0} size={16} />
@@ -323,8 +408,7 @@ const styles = StyleSheet.create({
   navBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm,
-    gap: Spacing.sm,
-    zIndex: 10,
+    gap: Spacing.sm, zIndex: 10,
   },
   backBtn: {
     width: 44, height: 44, borderRadius: Radius.full,
@@ -378,8 +462,7 @@ const styles = StyleSheet.create({
   // Best score
   bestScoreRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderRadius: Radius.lg, padding: Spacing.md,
-    borderWidth: 1.5,
+    borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1.5,
   },
   bestLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.semibold, textTransform: 'uppercase', letterSpacing: 0.4 },
   bestScore: { fontSize: FontSize.xxxl, fontWeight: FontWeight.extrabold },
@@ -395,10 +478,39 @@ const styles = StyleSheet.create({
 
   // Vocab section
   vocabSection: { padding: Spacing.lg },
-  vocabHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: 4 },
+
+  // Header row: title+count on left, preview button on right
+  vocabHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 4,
+  },
+  vocabHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   sectionTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
   countBadge: { borderRadius: Radius.full, width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   countText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extrabold },
+
+  // Preview / Stop button
+  previewBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: Radius.full, borderWidth: 1.5,
+    paddingHorizontal: 12, paddingVertical: 7,
+    minHeight: 36,
+  },
+  previewBtnIcon: { fontSize: FontSize.sm },
+  previewBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+
+  // Playing progress banner
+  playingBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    borderRadius: Radius.md, borderWidth: 1,
+    paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  playingIcon: { fontSize: 18 },
+  playingWord: { flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.extrabold },
+  playingPill: { borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 3 },
+  playingPillText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extrabold },
+
   vocabHint: { fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.md, fontStyle: 'italic' },
 
   // Vocab card
@@ -422,9 +534,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   speakIcon: { fontSize: 20 },
-  meaningRow: {
-    borderLeftWidth: 3, paddingLeft: Spacing.sm, marginTop: 4,
-  },
+  meaningRow: { borderLeftWidth: 3, paddingLeft: Spacing.sm, marginTop: 4 },
   meaning: { fontSize: FontSize.base, color: Colors.textPrimary, fontWeight: FontWeight.semibold, lineHeight: 22 },
   exampleToggle: { paddingTop: 4, alignSelf: 'flex-start' },
   exampleToggleText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
