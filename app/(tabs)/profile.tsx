@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Switch,
+  View, Text, StyleSheet, ScrollView, Pressable, Switch, FlatList,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useUser } from '../../hooks/useUser';
@@ -24,6 +25,10 @@ import { isSoundEnabled, setSoundEnabled } from '../../services/soundService';
 import { NotificationSettingsSheet } from '../../components/NotificationSettingsSheet';
 import { useAlert } from '@/template';
 import { Modal } from 'react-native';
+
+const AVATAR_STORAGE_KEY = 'user_avatar';
+const DEFAULT_AVATAR = '🧑';
+const AVATAR_OPTIONS = ['👤','🧑','👩','🧒','👴','👵','🧑‍💻','🧑‍🎓','🦸','🦹','🧙','🧚','🧛','🐱','🐶','🐼','🦊','🐸','🌟','🎭'];
 
 const GOAL_OPTIONS = [
   { xp: 10, label: '☕ Casual', desc: '10 XP/day' },
@@ -49,6 +54,8 @@ export default function ProfileScreen() {
   const [showNotifSheet, setShowNotifSheet] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
   const [freezeCount, setFreezeCount] = useState(0);
+  const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -58,8 +65,17 @@ export default function ProfileScreen() {
       getNotificationSettings().then(setNotifSettings);
       isSoundEnabled().then(setSoundOn);
       getStreakFreezeCount().then(setFreezeCount);
+      AsyncStorage.getItem(AVATAR_STORAGE_KEY).then(val => {
+        if (val) setAvatar(val);
+      });
     }
   }, [user?.id]);
+
+  const handleAvatarSelect = async (emoji: string) => {
+    setAvatar(emoji);
+    await AsyncStorage.setItem(AVATAR_STORAGE_KEY, emoji);
+    setShowAvatarPicker(false);
+  };
 
   const loadAchievements = async () => {
     if (!user) return;
@@ -113,9 +129,17 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarEmoji}>🧑</Text>
-          </View>
+          <Pressable
+            onPress={() => setShowAvatarPicker(true)}
+            style={({ pressed }) => [styles.avatarWrap, pressed && { opacity: 0.8 }]}
+          >
+            <View style={styles.avatar}>
+              <Text style={styles.avatarEmoji}>{avatar}</Text>
+            </View>
+            <View style={styles.avatarEditBadge}>
+              <Text style={styles.avatarEditIcon}>✏️</Text>
+            </View>
+          </Pressable>
           <Text style={styles.username}>{user.username}</Text>
           <View style={styles.levelRow}>
             <View style={styles.levelBadge}>
@@ -281,6 +305,38 @@ export default function ProfileScreen() {
         }}
       />
 
+      {/* Avatar Picker Modal */}
+      <Modal visible={showAvatarPicker} transparent animationType="fade" onRequestClose={() => setShowAvatarPicker(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowAvatarPicker(false)} />
+        <View style={styles.avatarPickerSheet}>
+          <View style={styles.avatarPickerHandle} />
+          <Text style={styles.avatarPickerTitle}>Choose Your Avatar</Text>
+          <Text style={styles.avatarPickerSub}>Tap an emoji to set it as your avatar</Text>
+          <FlatList
+            data={AVATAR_OPTIONS}
+            keyExtractor={item => item}
+            numColumns={5}
+            scrollEnabled={false}
+            contentContainerStyle={styles.avatarGrid}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => handleAvatarSelect(item)}
+                style={({ pressed }) => [
+                  styles.avatarOption,
+                  item === avatar && styles.avatarOptionSelected,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={styles.avatarOptionEmoji}>{item}</Text>
+              </Pressable>
+            )}
+          />
+          <Pressable onPress={() => setShowAvatarPicker(false)} style={styles.avatarPickerClose}>
+            <Text style={styles.avatarPickerCloseText}>Cancel</Text>
+          </Pressable>
+        </View>
+      </Modal>
+
       {/* Achievement Detail Modal */}
       <Modal visible={!!selectedAchievement} transparent animationType="fade" onRequestClose={() => setSelectedAchievement(null)}>
         <Pressable style={styles.modalOverlay} onPress={() => setSelectedAchievement(null)} />
@@ -314,8 +370,42 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: Spacing.lg, paddingBottom: 100 },
   profileHeader: { alignItems: 'center', paddingVertical: Spacing.xl },
-  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: Colors.primaryBg, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md, borderWidth: 3, borderColor: Colors.primary },
-  avatarEmoji: { fontSize: 50 },
+  avatarWrap: { position: 'relative', marginBottom: Spacing.md },
+  avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.primaryBg, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: Colors.primary },
+  avatarEmoji: { fontSize: 52 },
+  avatarEditBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: Colors.surface, borderWidth: 2, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarEditIcon: { fontSize: 13 },
+  // Avatar picker
+  avatarPickerSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: Spacing.xl, alignItems: 'center', gap: Spacing.sm,
+  },
+  avatarPickerHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, marginBottom: Spacing.sm },
+  avatarPickerTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
+  avatarPickerSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm },
+  avatarGrid: { gap: Spacing.sm, paddingHorizontal: Spacing.sm },
+  avatarOption: {
+    width: 52, height: 52, borderRadius: 26, margin: 4,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.surface, borderWidth: 2, borderColor: Colors.border,
+  },
+  avatarOptionSelected: {
+    borderColor: Colors.primary, backgroundColor: Colors.primaryBg,
+    transform: [{ scale: 1.12 }],
+  },
+  avatarOptionEmoji: { fontSize: 26 },
+  avatarPickerClose: {
+    marginTop: Spacing.sm, paddingVertical: 12, paddingHorizontal: Spacing.xl,
+    borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.border,
+  },
+  avatarPickerCloseText: { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.textSecondary },
   username: { fontSize: FontSize.xxl, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm },
   levelBadge: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 4 },
