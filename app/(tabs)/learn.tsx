@@ -200,6 +200,66 @@ function LessonNode({
   );
 }
 
+// ─── Category Stats Strip ───────────────────────────────────────────────────
+interface CategoryStatsStripProps {
+  category: string;
+  lessons: Lesson[];
+  getStatus: (id: string) => string;
+  getStars: (id: string) => number;
+}
+
+function CategoryStatsStrip({ category, lessons, getStatus, getStars }: CategoryStatsStripProps) {
+  const catLessons = lessons.filter(l => l.category === category);
+  const completed = catLessons.filter(l => getStatus(l.id) === LESSON_STATUS.COMPLETED);
+  const totalXpEarned = completed.reduce((sum, l) => sum + l.xpReward, 0);
+  const avgStars =
+    completed.length === 0
+      ? 0
+      : completed.reduce((sum, l) => sum + getStars(l.id), 0) / completed.length;
+  const catColor = CATEGORY_COLORS[category] || Colors.primary;
+
+  const statItems = [
+    { icon: '✅', value: `${completed.length}/${catLessons.length}`, label: 'Lessons' },
+    { icon: '⚡', value: `${totalXpEarned}`, label: 'XP Earned' },
+    { icon: '⭐', value: completed.length === 0 ? '—' : avgStars.toFixed(1), label: 'Avg Stars' },
+  ];
+
+  return (
+    <View style={[statsStyles.strip, { borderColor: catColor + '44', backgroundColor: catColor + '0C' }]}>
+      {statItems.map((item, i) => (
+        <React.Fragment key={item.label}>
+          {i > 0 && <View style={statsStyles.divider} />}
+          <View style={statsStyles.statItem}>
+            <Text style={statsStyles.statIcon}>{item.icon}</Text>
+            <Text style={[statsStyles.statValue, { color: catColor }]}>{item.value}</Text>
+            <Text style={statsStyles.statLabel}>{item.label}</Text>
+          </View>
+        </React.Fragment>
+      ))}
+    </View>
+  );
+}
+
+const statsStyles = StyleSheet.create({
+  strip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
+    marginBottom: 2,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.md,
+  },
+  statItem: { flex: 1, alignItems: 'center', gap: 3 },
+  statIcon: { fontSize: 18 },
+  statValue: { fontSize: FontSize.lg, fontWeight: FontWeight.extrabold },
+  statLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  divider: { width: 1, height: 44, backgroundColor: Colors.border },
+});
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function LearnScreen() {
   const router = useRouter();
@@ -256,16 +316,24 @@ export default function LearnScreen() {
       <CategoryFilterBar activeFilter={activeFilter} onSelect={handleFilterChange} />
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Active filter hint */}
+        {/* Active filter hint + stats strip */}
         {activeFilter && (
-          <View style={[styles.filterHint, { backgroundColor: (CATEGORY_COLORS[activeFilter] || Colors.primary) + '14' }]}>
-            <Text style={[styles.filterHintText, { color: CATEGORY_COLORS[activeFilter] || Colors.primary }]}>
-              {CATEGORY_ICONS[activeFilter]} Showing {CATEGORY_LABELS[activeFilter] || activeFilter} lessons · {visibleLessons.length} total
-            </Text>
-            <Pressable onPress={() => handleFilterChange(null)} hitSlop={8}>
-              <Text style={[styles.filterClearText, { color: CATEGORY_COLORS[activeFilter] || Colors.primary }]}>✕ Clear</Text>
-            </Pressable>
-          </View>
+          <>
+            <View style={[styles.filterHint, { backgroundColor: (CATEGORY_COLORS[activeFilter] || Colors.primary) + '14' }]}>
+              <Text style={[styles.filterHintText, { color: CATEGORY_COLORS[activeFilter] || Colors.primary }]}>
+                {CATEGORY_ICONS[activeFilter]} Showing {CATEGORY_LABELS[activeFilter] || activeFilter} lessons · {visibleLessons.length} total
+              </Text>
+              <Pressable onPress={() => handleFilterChange(null)} hitSlop={8}>
+                <Text style={[styles.filterClearText, { color: CATEGORY_COLORS[activeFilter] || Colors.primary }]}>✕ Clear</Text>
+              </Pressable>
+            </View>
+            <CategoryStatsStrip
+              category={activeFilter}
+              lessons={lessons}
+              getStatus={getStatus}
+              getStars={getStars}
+            />
+          </>
         )}
 
         {/* Path canvas */}
