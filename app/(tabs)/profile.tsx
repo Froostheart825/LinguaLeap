@@ -100,6 +100,7 @@ export default function ProfileScreen() {
   const totalStars = progress.reduce((a, p) => a + p.stars, 0);
   const unlockedCount = achievements.filter(a => a.unlockedAt !== null).length;
 
+  const todayStr = new Date().toISOString().split('T')[0];
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -107,10 +108,15 @@ export default function ProfileScreen() {
     const dayXp = xpHistory
       .filter(h => new Date(h.earnedAt).toISOString().split('T')[0] === dayStr)
       .reduce((sum, h) => sum + h.xpGained, 0);
-    return { day: d.toLocaleDateString('en', { weekday: 'short' }), xp: dayXp };
+    return {
+      day: d.toLocaleDateString('en', { weekday: 'short' }),
+      xp: dayXp,
+      isToday: dayStr === todayStr,
+    };
   });
 
   const maxXp = Math.max(...last7Days.map(d => d.xp), 1);
+  const totalWeeklyXp = last7Days.reduce((sum, d) => sum + d.xp, 0);
 
   const handleLogout = () => {
     showAlert('Logout', 'Are you sure you want to log out?', [
@@ -174,15 +180,35 @@ export default function ProfileScreen() {
 
         {/* XP Chart */}
         <View style={[styles.card, Shadow.sm]}>
-          <Text style={styles.cardTitle}>XP This Week</Text>
+          <View style={styles.chartHeaderRow}>
+            <Text style={styles.cardTitle}>XP This Week</Text>
+            <View style={styles.weeklyXpBadge}>
+              <Text style={styles.weeklyXpIcon}>⚡</Text>
+              <Text style={styles.weeklyXpValue}>{totalWeeklyXp}</Text>
+              <Text style={styles.weeklyXpLabel}>total</Text>
+            </View>
+          </View>
           <View style={styles.chartWrap}>
             {last7Days.map(day => (
               <View key={day.day} style={styles.chartCol}>
-                <Text style={styles.chartXp}>{day.xp > 0 ? day.xp : ''}</Text>
+                <Text style={[styles.chartXp, day.isToday && styles.chartXpToday]}>
+                  {day.xp > 0 ? day.xp : ''}
+                </Text>
                 <View style={styles.chartBarWrap}>
-                  <View style={[styles.chartBar, { height: Math.max(4, (day.xp / maxXp) * 80) }]} />
+                  <View
+                    style={[
+                      styles.chartBar,
+                      {
+                        height: Math.max(4, (day.xp / maxXp) * 80),
+                        backgroundColor: day.isToday ? Colors.primary : Colors.primary + '55',
+                      },
+                      day.isToday && styles.chartBarToday,
+                    ]}
+                  />
                 </View>
-                <Text style={styles.chartDay}>{day.day}</Text>
+                <Text style={[styles.chartDay, day.isToday && styles.chartDayToday]}>
+                  {day.isToday ? 'Today' : day.day}
+                </Text>
               </View>
             ))}
           </View>
@@ -420,12 +446,25 @@ const styles = StyleSheet.create({
   statIcon: { fontSize: 24 },
   statValue: { fontSize: FontSize.xl, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
   statLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
-  chartWrap: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 110 },
+  chartHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  weeklyXpBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: Colors.primaryBg, borderRadius: Radius.full,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderWidth: 1.5, borderColor: Colors.primary + '55',
+  },
+  weeklyXpIcon: { fontSize: 13 },
+  weeklyXpValue: { fontSize: FontSize.base, fontWeight: FontWeight.extrabold, color: Colors.primary },
+  weeklyXpLabel: { fontSize: FontSize.xs, color: Colors.primaryDark, fontWeight: FontWeight.semibold },
+  chartWrap: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 116 },
   chartCol: { flex: 1, alignItems: 'center', gap: 4 },
-  chartXp: { fontSize: 9, color: Colors.primary, fontWeight: FontWeight.bold },
-  chartBarWrap: { flex: 1, justifyContent: 'flex-end', width: '70%' },
-  chartBar: { backgroundColor: Colors.primary, borderRadius: 4, width: '100%', opacity: 0.85 },
-  chartDay: { fontSize: 10, color: Colors.textMuted, fontWeight: FontWeight.semibold },
+  chartXp: { fontSize: 9, color: Colors.textMuted, fontWeight: FontWeight.bold },
+  chartXpToday: { color: Colors.primary, fontSize: 10 },
+  chartBarWrap: { flex: 1, justifyContent: 'flex-end', width: '68%' },
+  chartBar: { borderRadius: 5, width: '100%' },
+  chartBarToday: { borderRadius: 6, ...Shadow.sm },
+  chartDay: { fontSize: 9, color: Colors.textMuted, fontWeight: FontWeight.semibold },
+  chartDayToday: { color: Colors.primary, fontWeight: FontWeight.extrabold, fontSize: 10 },
   achieveHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   achieveCount: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.primary },
   achieveGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
