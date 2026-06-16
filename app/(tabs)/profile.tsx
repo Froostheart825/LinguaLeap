@@ -135,6 +135,15 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
+          {/* Settings button top-right */}
+          <Pressable
+            onPress={() => router.push('/settings')}
+            style={({ pressed }) => [styles.settingsBtn, pressed && { opacity: 0.7 }]}
+            hitSlop={8}
+          >
+            <Text style={styles.settingsBtnIcon}>⚙️</Text>
+          </Pressable>
+
           <Pressable
             onPress={() => setShowAvatarPicker(true)}
             style={({ pressed }) => [styles.avatarWrap, pressed && { opacity: 0.8 }]}
@@ -395,7 +404,15 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: Spacing.lg, paddingBottom: 100 },
-  profileHeader: { alignItems: 'center', paddingVertical: Spacing.xl },
+  profileHeader: { alignItems: 'center', paddingVertical: Spacing.xl, position: 'relative' },
+  settingsBtn: {
+    position: 'absolute', top: Spacing.md, right: 0,
+    width: 44, height: 44, borderRadius: Radius.full,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 1,
+  },
+  settingsBtnIcon: { fontSize: 20 },
   avatarWrap: { position: 'relative', marginBottom: Spacing.md },
   avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.primaryBg, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: Colors.primary },
   avatarEmoji: { fontSize: 52 },
