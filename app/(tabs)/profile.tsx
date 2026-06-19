@@ -26,6 +26,20 @@ import { NotificationSettingsSheet } from '../../components/NotificationSettings
 import { useAlert } from '@/template';
 import { Modal } from 'react-native';
 
+// ── Level thresholds (mirrors calcLevel in userService) ────────────────────
+const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600, 4500];
+
+function getLevelProgress(totalXp: number, level: number) {
+  if (level >= 10) {
+    return { earned: totalXp - LEVEL_THRESHOLDS[8], needed: LEVEL_THRESHOLDS[9] - LEVEL_THRESHOLDS[8], progress: 1, nextLevel: 10, isMax: true };
+  }
+  const currentThreshold = LEVEL_THRESHOLDS[level - 1] ?? 0;
+  const nextThreshold = LEVEL_THRESHOLDS[level] ?? currentThreshold + 100;
+  const earned = totalXp - currentThreshold;
+  const needed = nextThreshold - currentThreshold;
+  return { earned, needed, progress: Math.min(1, Math.max(0, earned / needed)), nextLevel: level + 1, isMax: false };
+}
+
 const AVATAR_STORAGE_KEY = 'user_avatar';
 const DEFAULT_AVATAR = '🧑';
 const AVATAR_OPTIONS = ['👤','🧑','👩','🧒','👴','👵','🧑‍💻','🧑‍🎓','🦸','🦹','🧙','🧚','🧛','🐱','🐶','🐼','🦊','🐸','🌟','🎭'];
@@ -95,6 +109,8 @@ export default function ProfileScreen() {
   };
 
   if (!user) return null;
+
+  const levelData = getLevelProgress(user.totalXp, user.level);
 
   const completedLessons = progress.filter(p => p.status === LESSON_STATUS.COMPLETED).length;
   const totalStars = progress.reduce((a, p) => a + p.stars, 0);
@@ -179,6 +195,19 @@ export default function ProfileScreen() {
             <Text style={styles.joinDate}>
               Joined {new Date(user.createdAt).toLocaleDateString('en', { month: 'short', year: 'numeric' })}
             </Text>
+          </View>
+
+          {/* Level progress bar */}
+          <View style={styles.levelProgressWrap}>
+            <View style={styles.levelProgressLabelRow}>
+              <Text style={styles.levelProgressLabel}>
+                {levelData.isMax ? '🌟 Max Level Reached' : `${levelData.earned} / ${levelData.needed} XP to Level ${levelData.nextLevel}`}
+              </Text>
+              <Text style={styles.levelProgressPct}>
+                {levelData.isMax ? '100%' : `${Math.round(levelData.progress * 100)}%`}
+              </Text>
+            </View>
+            <ProgressBar progress={levelData.progress} height={8} />
           </View>
         </View>
 
@@ -511,6 +540,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.border,
   },
   avatarPickerCloseText: { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.textSecondary },
+  levelProgressWrap: { width: '100%', marginTop: Spacing.md, gap: 6 },
+  levelProgressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  levelProgressLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
+  levelProgressPct: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.extrabold },
   username: { fontSize: FontSize.xxl, fontWeight: FontWeight.extrabold, color: Colors.textPrimary },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm },
   levelBadge: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 4 },
