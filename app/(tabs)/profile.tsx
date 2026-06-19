@@ -118,6 +118,22 @@ export default function ProfileScreen() {
   const maxXp = Math.max(...last7Days.map(d => d.xp), 1);
   const totalWeeklyXp = last7Days.reduce((sum, d) => sum + d.xp, 0);
 
+  const activeDays = new Set(
+    xpHistory.map(h => new Date(h.earnedAt).toISOString().split('T')[0])
+  );
+  const last30Days = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (29 - i));
+    const dayStr = d.toISOString().split('T')[0];
+    return {
+      dayNum: d.getDate(),
+      dayStr,
+      isActive: activeDays.has(dayStr),
+      isToday: dayStr === todayStr,
+    };
+  });
+  const activeCount30 = last30Days.filter(d => d.isActive).length;
+
   const handleLogout = () => {
     showAlert('Logout', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -220,6 +236,52 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             ))}
+          </View>
+        </View>
+
+        {/* 30-Day Activity Calendar */}
+        <View style={[styles.card, Shadow.sm]}>
+          <View style={styles.calendarHeader}>
+            <Text style={styles.cardTitle}>🗓️ Activity Calendar</Text>
+            <View style={styles.calendarBadge}>
+              <Text style={styles.calendarBadgeText}>{activeCount30} / 30 days</Text>
+            </View>
+          </View>
+          <View style={styles.calendarGrid}>
+            {last30Days.map((day) => (
+              <View
+                key={day.dayStr}
+                style={[
+                  styles.calCell,
+                  day.isActive ? styles.calCellActive : styles.calCellInactive,
+                  day.isToday && styles.calCellToday,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.calCellText,
+                    day.isActive ? styles.calCellTextActive : styles.calCellTextInactive,
+                    day.isToday && styles.calCellTextToday,
+                  ]}
+                >
+                  {day.dayNum}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.calLegend}>
+            <View style={styles.calLegendItem}>
+              <View style={[styles.calLegendDot, { backgroundColor: Colors.primary }]} />
+              <Text style={styles.calLegendLabel}>Active</Text>
+            </View>
+            <View style={styles.calLegendItem}>
+              <View style={[styles.calLegendDot, { backgroundColor: Colors.border }]} />
+              <Text style={styles.calLegendLabel}>Inactive</Text>
+            </View>
+            <View style={styles.calLegendItem}>
+              <View style={[styles.calLegendDot, { backgroundColor: Colors.primary, borderWidth: 2, borderColor: Colors.secondary }]} />
+              <Text style={styles.calLegendLabel}>Today</Text>
+            </View>
           </View>
         </View>
 
@@ -482,6 +544,32 @@ const styles = StyleSheet.create({
   chartBarToday: { borderRadius: 6, ...Shadow.sm },
   chartDay: { fontSize: 9, color: Colors.textMuted, fontWeight: FontWeight.semibold },
   chartDayToday: { color: Colors.primary, fontWeight: FontWeight.extrabold, fontSize: 10 },
+  calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  calendarBadge: {
+    backgroundColor: Colors.primaryBg, borderRadius: Radius.full,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderWidth: 1.5, borderColor: Colors.primary + '55',
+  },
+  calendarBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.primary },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  calCell: {
+    width: 34, height: 34, borderRadius: 6,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  calCellActive: { backgroundColor: Colors.primary },
+  calCellInactive: { backgroundColor: Colors.border + '66' },
+  calCellToday: {
+    borderWidth: 2.5, borderColor: Colors.secondary,
+    backgroundColor: Colors.primary,
+  },
+  calCellText: { fontSize: 10, fontWeight: FontWeight.bold },
+  calCellTextActive: { color: '#fff' },
+  calCellTextInactive: { color: Colors.textMuted },
+  calCellTextToday: { color: '#fff' },
+  calLegend: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.md },
+  calLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  calLegendDot: { width: 12, height: 12, borderRadius: 3 },
+  calLegendLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.semibold },
   achieveHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   achieveCount: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.primary },
   achieveGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
